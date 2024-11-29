@@ -32,6 +32,7 @@ const TopUp = () => {
   const [amount, setAmount] = useState(0.0);
   const [minTopUp, setMinTopUp] = useState(1);
   const [topUpLink, setTopUpLink] = useState('');
+  const [paymentEnabled, setPaymentEnabled] = useState(false);
   const [enableOnlineTopUp, setEnableOnlineTopUp] = useState(false);
   const [userQuota, setUserQuota] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,7 +80,7 @@ const TopUp = () => {
   };
 
   const preTopUp = async (payment) => {
-    if (!enableOnlineTopUp) {
+    if (!paymentEnabled || !enableOnlineTopUp) {
       showError(t('管理员未开启在线充值！'));
       return;
     }
@@ -166,6 +167,9 @@ const TopUp = () => {
       }
       if (status.min_topup) {
         setMinTopUp(status.min_topup);
+      }
+      if (status.payment_enabled) {
+        setPaymentEnabled(status.payment_enabled)
       }
       if (status.enable_online_topup) {
         setEnableOnlineTopUp(status.enable_online_topup);
@@ -273,50 +277,56 @@ const TopUp = () => {
                   </Space>
                 </Form>
               </div>
-              <div style={{ marginTop: 20 }}>
-                <Divider>{t('在线充值')}</Divider>
-                <Form>
-                  <Form.Input
-                    disabled={!enableOnlineTopUp}
-                    field={'redemptionCount'}
-                    label={t('实付金额：') + ' ' + renderAmount()}
-                    placeholder={t('充值数量，最低 ') + renderQuotaWithAmount(minTopUp)}
-                    name='redemptionCount'
-                    type={'number'}
-                    value={topUpCount}
-                    onChange={async (value) => {
-                      if (value < 1) {
-                        value = 1;
-                      }
-                      setTopUpCount(value);
-                      await getAmount(value);
-                    }}
-                  />
-                  <Space>
-                    <Button
-                      type={'primary'}
-                      theme={'solid'}
-                      onClick={async () => {
-                        preTopUp('zfb');
-                      }}
-                    >
-                      {t('支付宝')}
-                    </Button>
-                    <Button
-                      style={{
-                        backgroundColor: 'rgba(var(--semi-green-5), 1)',
-                      }}
-                      type={'primary'}
-                      theme={'solid'}
-                      onClick={async () => {
-                        preTopUp('wx');
-                      }}
-                    >
-                      {t('微信')}
-                    </Button>
-                  </Space>
-                </Form>
-              </div>
+              {paymentEnabled ? (
+                  <div style={{marginTop: 20}}>
+                    <Divider>{t('在线充值')}</Divider>
+                    <Form>
+                      <Form.Input
+                          disabled={!paymentEnabled}
+                          field={'redemptionCount'}
+                          label={t('实付金额：') + ' ' + renderAmount()}
+                          placeholder={t('充值数量，最低 ') + renderQuotaWithAmount(minTopUp)}
+                          name='redemptionCount'
+                          type={'number'}
+                          value={topUpCount}
+                          onChange={async (value) => {
+                            if (value < 1) {
+                              value = 1;
+                            }
+                            setTopUpCount(value);
+                            await getAmount(value);
+                          }}
+                      />
+                      <Space>
+                        <Button
+                            disabled={!enableOnlineTopUp}
+                            type={'primary'}
+                            theme={'solid'}
+                            onClick={async () => {
+                              preTopUp('zfb');
+                            }}
+                        >
+                          {t('支付宝')}
+                        </Button>
+                        <Button
+                            style={{
+                              backgroundColor: 'rgba(var(--semi-green-5), 1)',
+                            }}
+                            disabled={!enableOnlineTopUp}
+                            type={'primary'}
+                            theme={'solid'}
+                            onClick={async () => {
+                              preTopUp('wx');
+                            }}
+                        >
+                          {t('微信')}
+                        </Button>
+                      </Space>
+                    </Form>
+                  </div>
+              ) : (
+                  <></>
+              )}
               {/*<div style={{ display: 'flex', justifyContent: 'right' }}>*/}
               {/*    <Text>*/}
               {/*        <Link onClick={*/}
