@@ -37,6 +37,7 @@ type User struct {
 	InviterId        int            `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
 	LinuxDOId        string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
+	StripeCustomer   string         `json:"stripe_customer" gorm:"column:stripe_customer;index"`
 }
 
 func (user *User) GetAccessToken() string {

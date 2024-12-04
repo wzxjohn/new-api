@@ -37,6 +37,11 @@ const SystemSetting = () => {
     TopupGroupRatio: '',
     EpayAddress: '',
     EpayCallbackAddress: '',
+    StripeApiSecret: '',
+    StripeWebhookSecret: '',
+    StripePriceId: '',
+    StripeUnitPrice: 8.0,
+    StripeMinTopUp: 1,
     Footer: '',
     WeChatAuthEnabled: '',
     WeChatServerAddress: '',
@@ -161,6 +166,11 @@ const SystemSetting = () => {
       name === 'EpayPrice' ||
       name === 'EpayAddress' ||
       name === 'EpayCallbackAddress' ||
+      name === 'StripeApiSecret' ||
+      name === 'StripeWebhookSecret' ||
+      name === 'StripePriceId' ||
+      name === 'StripeUnitPrice' ||
+      name === 'StripeMinTopUp' ||
       name === 'GitHubClientId' ||
       name === 'GitHubClientSecret' ||
       name === 'WeChatServerAddress' ||
@@ -227,6 +237,39 @@ const SystemSetting = () => {
       let EpayCallbackAddress = removeTrailingSlash(inputs.EpayCallbackAddress)
       await updateOption('EpayCallbackAddress', EpayCallbackAddress)
     }
+
+    // Stripe Config Begin
+    if (inputs.StripeApiSecret !== undefined && inputs.StripeApiSecret !== '') {
+      let stripeApiSecret = removeTrailingSlash(inputs.StripeApiSecret);
+      if (stripeApiSecret && !stripeApiSecret.startsWith('sk_') && !stripeApiSecret.startsWith('rk_')) {
+        showError('输入了无效的Stripe API密钥');
+        return;
+      }
+      stripeApiSecret && (await updateOption('StripeApiSecret', stripeApiSecret));
+    }
+
+    if (inputs.StripeWebhookSecret !== undefined && inputs.StripeWebhookSecret !== '') {
+      let stripeWebhookSecret = removeTrailingSlash(inputs.StripeWebhookSecret);
+      if (stripeWebhookSecret && !stripeWebhookSecret.startsWith('whsec_')) {
+        showError('输入了无效的Stripe Webhook签名密钥');
+        return;
+      }
+      stripeWebhookSecret && (await updateOption('StripeWebhookSecret', stripeWebhookSecret));
+    }
+
+    if (inputs.StripePriceId !== undefined && inputs.StripePriceId !== '') {
+      let stripePriceId = removeTrailingSlash(inputs.StripePriceId);
+      if (stripePriceId && !stripePriceId.startsWith('price_')) {
+        showError('输入了无效的Stripe 物品价格ID');
+        return;
+      }
+      stripePriceId && (await updateOption('StripePriceId', stripePriceId));
+    }
+
+    await updateOption('StripeUnitPrice', inputs.StripeUnitPrice);
+
+    await updateOption('StripeMinTopUp', inputs.StripeMinTopUp)
+    // Stripe Config End
   };
 
   const submitSMTP = async () => {
@@ -403,7 +446,26 @@ const SystemSetting = () => {
           <Form.Button onClick={submitWorker}>更新Worker设置</Form.Button>
           <Divider />
           <Header as='h3' inverted={isDark}>
-            支付设置（当前仅支持易支付接口，默认使用上方服务器地址作为回调地址！）
+            支付设置（当前仅支持易支付及 Stripe 接口，默认使用上方服务器地址作为回调地址！）
+            <Header.Subheader>
+              Stripe 密钥、Webhook 等设置请
+              <a
+                  href='https://dashboard.stripe.com/developers'
+                  target='_blank'
+                  rel='noreferrer'
+              >
+                点击此处
+              </a>
+              进行设置，最好先在
+              <a
+                  href='https://dashboard.stripe.com/test/developers'
+                  target='_blank'
+                  rel='noreferrer'
+              >
+                测试环境
+              </a>
+              进行测试
+            </Header.Subheader>
           </Header>
           <Form.Group widths='equal'>
             <Form.Input
@@ -451,6 +513,55 @@ const SystemSetting = () => {
               name='MinTopUp'
               min={1}
               onChange={handleInputChange}
+            />
+          </Form.Group>
+          <Message>
+            以下为 Stripe 设置。Webhook 填：
+            <code>{`${inputs.ServerAddress}/api/stripe/webhook`}</code>
+            ，需要包含事件：<code>checkout.session.completed</code> 和{' '}
+            <code>checkout.session.expired</code>
+          </Message>
+          <Form.Group widths='equal'>
+            <Form.Input
+                label='API密钥'
+                placeholder='sk_xxx 或 rk_xxx 的 Stripe 密钥，敏感信息不显示'
+                value={inputs.StripeApiSecret}
+                name='StripeApiSecret'
+                onChange={handleInputChange}
+            />
+            <Form.Input
+                label='Webhook签名密钥'
+                placeholder='whsec_xxx 的 Webhook 签名密钥，敏感信息不显示'
+                value={inputs.StripeWebhookSecret}
+                name='StripeWebhookSecret'
+                onChange={handleInputChange}
+            />
+          </Form.Group>
+          <Form.Group widths='equal'>
+            <Form.Input
+                label='商品价格ID'
+                placeholder='price_xxx 的商品价格 ID，新建产品后可获得'
+                value={inputs.StripePriceId}
+                name='StripePriceId'
+                onChange={handleInputChange}
+            />
+            <Form.Input
+                label='商品单价（元）'
+                placeholder='商品的人民币价格'
+                value={inputs.StripeUnitPrice}
+                name='StripeUnitPrice'
+                type={'number'}
+                min={0}
+                onChange={handleInputChange}
+            />
+            <Form.Input
+                label='最低充值数量'
+                placeholder='例如：2，就是最低充值2件商品'
+                value={inputs.StripeMinTopUp}
+                name='StripeMinTopUp'
+                type={'number'}
+                min={1}
+                onChange={handleInputChange}
             />
           </Form.Group>
           <Form.Group widths='equal'>

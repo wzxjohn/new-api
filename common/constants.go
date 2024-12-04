@@ -281,3 +281,9 @@ var ChannelBaseURLs = []string{
 	"https://api.mistral.ai",                    //42
 	"https://api.deepseek.com",                  //43
 }
+
+const (
+	TopUpStatusPending = "pending"
+	TopUpStatusSuccess = "success"
+	TopUpStatusExpired = "expired"
+)
