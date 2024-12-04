@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"github.com/stripe/stripe-go/v81/checkout/session"
 	"io"
 	"log"
 	"net/http"
@@ -15,21 +14,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v81"
+	"github.com/stripe/stripe-go/v81/checkout/session"
 	"github.com/stripe/stripe-go/v81/webhook"
 )
 
-func RequestStripe(c *gin.Context) {
-	var req PayRequest
-	err := c.ShouldBindJSON(&req)
-	if err != nil {
-		c.JSON(200, gin.H{"message": err.Error(), "data": 10})
-		return
-	}
-	if !constant.PaymentEnabled {
-		c.JSON(200, gin.H{"message": "error", "data": "管理员未开启在线支付"})
-		return
-	}
-	if req.PaymentMethod != "stripe" {
+const (
+	PaymentMethodStripe = "stripe"
+)
+
+func init() {
+	payNameAdaptorMap[PaymentMethodStripe] = &StripeAdaptor{}
+}
+
+type StripeAdaptor struct {
+}
+
+func (*StripeAdaptor) RequestPay(c *gin.Context, req *PayRequest) {
+	if req.PaymentMethod != PaymentMethodStripe {
 		c.JSON(200, gin.H{"message": "error", "data": "不支持的支付渠道"})
 		return
 	}

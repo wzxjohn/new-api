@@ -32,10 +32,12 @@ const TopUp = () => {
   const [topUpLink, setTopUpLink] = useState('');
   const [paymentEnabled, setPaymentEnabled] = useState(false);
   const [enableOnlineTopUp, setEnableOnlineTopUp] = useState(false);
+  const [enableStripeTopUp, setEnableStripeTopUp] = useState(false);
   const [userQuota, setUserQuota] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
   const [payWay, setPayWay] = useState('');
+  const [isPaying, setIsPaying] = useState(false);
 
   const topUp = async () => {
     if (redemptionCode === '') {
@@ -78,7 +80,7 @@ const TopUp = () => {
   };
 
   const preTopUp = async (payment) => {
-    if (!paymentEnabled || !enableOnlineTopUp) {
+    if (!paymentEnabled || ((payment === "zfb" || payment === "wx") && !enableOnlineTopUp) || (payment === "stripe"  && !enableStripeTopUp)) {
       showError('管理员未开启在线充值！');
       return;
     }
@@ -101,6 +103,7 @@ const TopUp = () => {
     }
     setOpen(false);
     try {
+      setIsPaying(true);
       const res = await API.post('/api/user/pay', {
         amount: parseInt(topUpCount),
         top_up_code: topUpCode,
@@ -133,11 +136,13 @@ const TopUp = () => {
           form.submit();
           document.body.removeChild(form);
         } else {
+          setIsPaying(false);
           showError(data);
           // setTopUpCount(parseInt(res.data.count));
           // setAmount(parseInt(data));
         }
       } else {
+        setIsPaying(false);
         showError(res);
       }
     } catch (err) {
@@ -171,6 +176,9 @@ const TopUp = () => {
       }
       if (status.enable_online_topup) {
         setEnableOnlineTopUp(status.enable_online_topup);
+      }
+      if (status.enable_stripe_topup) {
+        setEnableStripeTopUp(status.enable_stripe_topup)
       }
     }
     getUserQuota().then();
@@ -278,9 +286,10 @@ const TopUp = () => {
               {paymentEnabled ? (
                   <div style={{marginTop: 20}}>
                     <Divider>在线充值</Divider>
+                    {enableOnlineTopUp? (
+                    <div>
                     <Form>
                       <Form.Input
-                          disabled={!paymentEnabled}
                           field={'redemptionCount'}
                           label={'实付金额：' + renderAmount()}
                           placeholder={
@@ -299,7 +308,6 @@ const TopUp = () => {
                       />
                       <Space>
                         <Button
-                            disabled={!enableOnlineTopUp}
                             type={'primary'}
                             theme={'solid'}
                             onClick={async () => {
@@ -312,7 +320,6 @@ const TopUp = () => {
                             style={{
                               backgroundColor: 'rgba(var(--semi-green-5), 1)',
                             }}
-                            disabled={!enableOnlineTopUp}
                             type={'primary'}
                             theme={'solid'}
                             onClick={async () => {
@@ -323,6 +330,53 @@ const TopUp = () => {
                         </Button>
                       </Space>
                     </Form>
+                    </div>
+                        ):(
+                            <></>
+                        )}
+                    {enableStripeTopUp? (
+                        <div>
+                          <Form>
+                            <Form.Input
+                                field={'redemptionCount'}
+                                label={'实付金额：' + renderAmount()}
+                                placeholder={'充值数量，必须整数，最低' + minTopUp + '$'}
+                                name='redemptionCount'
+                                type={'number'}
+                                value={topUpCount}
+                                suffix={'$'}
+                                min={minTopUp}
+                                defaultValue={minTopUp}
+                                max={100000}
+                                onChange={async (value) => {
+                                  if (value < 1) {
+                                    value = 1;
+                                  }
+                                  if (value > 100000) {
+                                    value = 100000;
+                                  }
+                                  setTopUpCount(value);
+                                  await getAmount(value);
+                                }}
+                            />
+                            <Space>
+                              <Button
+                                  style={{ backgroundColor: '#b161fe' }}
+                                  type={'primary'}
+                                  disabled={isPaying}
+                                  theme={'solid'}
+                                  onClick={async () => {
+                                    preTopUp('stripe');
+                                  }}
+                              >
+                                {isPaying ? '支付中...' : '去支付'}
+                              </Button>
+                            </Space>
+                          </Form>
+                        </div>
+                    ):(
+                        <></>
+                    )}
                   </div>
               ) : (
                   <></>
