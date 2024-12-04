@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-type EpayRequest struct {
+type PayRequest struct {
 	Amount        int    `json:"amount"`
 	PaymentMethod string `json:"payment_method"`
 	TopUpCode     string `json:"top_up_code"`
@@ -63,7 +63,7 @@ func getMinTopup() int {
 }
 
 func RequestEpay(c *gin.Context) {
-	var req EpayRequest
+	var req PayRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		c.JSON(200, gin.H{"message": "error", "data": "参数错误"})
