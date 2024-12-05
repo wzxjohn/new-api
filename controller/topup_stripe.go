@@ -16,6 +16,7 @@ import (
 	"github.com/stripe/stripe-go/v81"
 	"github.com/stripe/stripe-go/v81/checkout/session"
 	"github.com/stripe/stripe-go/v81/webhook"
+	"github.com/thanhpk/randstr"
 )
 
 const (
@@ -66,7 +67,7 @@ func (*StripeAdaptor) RequestPay(c *gin.Context, req *PayRequest) {
 	user, _ := model.GetUserById(id, false)
 	chargedMoney := GetChargedAmount(float64(req.Amount), *user)
 
-	reference := fmt.Sprintf("new-api-ref-%d-%d-%s", user.Id, time.Now().UnixMilli(), common.RandomString(4))
+	reference := fmt.Sprintf("new-api-ref-%d-%d-%s", user.Id, time.Now().UnixMilli(), randstr.String(4))
 	referenceId := "ref_" + common.Sha1(reference)
 
 	payLink, err := genStripeLink(referenceId, user.StripeCustomer, user.Email, int64(req.Amount))
