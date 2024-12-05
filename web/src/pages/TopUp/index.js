@@ -29,6 +29,9 @@ const TopUp = () => {
   const [minTopupCount, setMinTopUpCount] = useState(1);
   const [amount, setAmount] = useState(0.0);
   const [minTopUp, setMinTopUp] = useState(1);
+  const [stripeTopUpCount, setStripeTopUpCount] = useState(0);
+  const [stripeAmount, setStripeAmount] = useState(0.0);
+  const [stripeMinTopUp, setStripeMinTopUp] = useState(1);
   const [topUpLink, setTopUpLink] = useState('');
   const [paymentEnabled, setPaymentEnabled] = useState(false);
   const [enableOnlineTopUp, setEnableOnlineTopUp] = useState(false);
@@ -84,9 +87,8 @@ const TopUp = () => {
       showError('管理员未开启在线充值！');
       return;
     }
-    await getAmount();
-    if (topUpCount < minTopUp) {
-      showError('充值数量不能小于' + minTopUp);
+    await getAmount(payment);
+    if (!checkMinTopUp(payment)) {
       return;
     }
     setPayWay(payment);
@@ -95,17 +97,16 @@ const TopUp = () => {
 
   const onlineTopUp = async () => {
     if (amount === 0) {
-      await getAmount();
+      await getAmount(payWay);
     }
-    if (topUpCount < minTopUp) {
-      showError('充值数量不能小于' + minTopUp);
+    if (!checkMinTopUp(payWay)) {
       return;
     }
     setOpen(false);
     try {
       setIsPaying(true);
       const res = await API.post('/api/user/pay', {
-        amount: parseInt(topUpCount),
+        amount: parseInt(getTopUpCount()),
         top_up_code: topUpCode,
         payment_method: payWay,
       });
@@ -113,28 +114,15 @@ const TopUp = () => {
         const { message, data } = res.data;
         // showInfo(message);
         if (message === 'success') {
-          let params = data;
-          let url = res.data.url;
-          let form = document.createElement('form');
-          form.action = url;
-          form.method = 'POST';
-          // 判断是否为safari浏览器
-          let isSafari =
-            navigator.userAgent.indexOf('Safari') > -1 &&
-            navigator.userAgent.indexOf('Chrome') < 1;
-          if (!isSafari) {
-            form.target = '_blank';
+          switch (payWay) {
+            case "zfb":
+            case "wx":
+              processEpayCallback(data)
+              break
+            case "stripe":
+              processStripeCallback(data)
+              break
           }
-          for (let key in params) {
-            let input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = params[key];
-            form.appendChild(input);
-          }
-          document.body.appendChild(form);
-          form.submit();
-          document.body.removeChild(form);
         } else {
           setIsPaying(false);
           showError(data);
@@ -150,6 +138,73 @@ const TopUp = () => {
     } finally {
     }
   };
+
+  const processEpayCallback = (data) => {
+    let params = data.params;
+    let url = data.url;
+    let form = document.createElement('form');
+    form.action = url;
+    form.method = 'POST';
+    // 判断是否为safari浏览器
+    let isSafari =
+        navigator.userAgent.indexOf('Safari') > -1 &&
+        navigator.userAgent.indexOf('Chrome') < 1;
+    if (!isSafari) {
+      form.target = '_blank';
+    }
+    for (let key in params) {
+      let input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = params[key];
+      form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  }
+
+  const processStripeCallback = (data) => {
+    location.href = data.pay_link;
+  };
+
+  const checkMinTopUp = (method) => {
+    let localMinTopUp
+    let value
+    switch (method) {
+      case "zfb":
+      case "wx":
+        localMinTopUp = minTopUp
+        value = topUpCount
+        break
+      case "stripe":
+        localMinTopUp = stripeMinTopUp
+        value = stripeTopUpCount
+        break
+      default:
+        showError("错误的支付渠道")
+        return false
+    }
+
+    if (value < localMinTopUp) {
+      showError('充值数量不能小于' + localMinTopUp);
+      return false
+    }
+    return true
+  }
+
+  const getTopUpCount = (method) => {
+    if (method === undefined) {
+      method = payWay
+    }
+    switch (method) {
+        case "zfb":
+        case "wx":
+            return topUpCount
+        case "stripe":
+            return stripeTopUpCount
+    }
+  }
 
   const getUserQuota = async () => {
     let res = await API.get(`/api/user/self`);
@@ -171,6 +226,9 @@ const TopUp = () => {
       if (status.min_topup) {
         setMinTopUp(status.min_topup);
       }
+      if (status.stripe_min_topup) {
+        setStripeMinTopUp(status.stripe_min_topup)
+      }
       if (status.payment_enabled) {
         setPaymentEnabled(status.payment_enabled)
       }
@@ -184,27 +242,48 @@ const TopUp = () => {
     getUserQuota().then();
   }, []);
 
+  const renderAmountByMethod = () => {
+    switch (payWay) {
+      case "zfb":
+      case "wx":
+        return renderAmount()
+      case "stripe":
+        return renderStripeAmount()
+      default:
+        return 0
+    }
+  }
   const renderAmount = () => {
     // console.log(amount);
     return amount + '元';
   };
 
-  const getAmount = async (value) => {
+  const renderStripeAmount = () => {
+    // console.log(amount);
+    return stripeAmount + '元';
+  };
+
+  const getAmount = async (method, value) => {
+    if (method === undefined) {
+      showError("错误的支付渠道")
+      return
+    }
     if (value === undefined) {
-      value = topUpCount;
+      value = getTopUpCount(method)
     }
     try {
       const res = await API.post('/api/user/amount', {
         amount: parseFloat(value),
         top_up_code: topUpCode,
+        payment_method: method,
       });
       if (res !== undefined) {
         const { message, data } = res.data;
         // showInfo(message);
         if (message === 'success') {
-          setAmount(parseFloat(data));
+          setAmountByMethod(method, parseFloat(data))
         } else {
-          setAmount(0);
+          setAmountByMethod(method, 0)
           Toast.error({ content: '错误：' + data, id: 'getAmount' });
           // setTopUpCount(parseInt(res.data.count));
           // setAmount(parseInt(data));
@@ -217,6 +296,18 @@ const TopUp = () => {
     } finally {
     }
   };
+
+  const setAmountByMethod = (method, value) => {
+    switch (method) {
+      case "zfb":
+      case "wx":
+        setAmount(value);
+        break
+      case "stripe":
+        setStripeAmount(value)
+        break
+    }
+  }
 
   const handleCancel = () => {
     setOpen(false);
@@ -238,8 +329,8 @@ const TopUp = () => {
             size={'small'}
             centered={true}
           >
-            <p>充值数量：{topUpCount}</p>
-            <p>实付金额：{renderAmount()}</p>
+            <p>充值数量：{getTopUpCount()}</p>
+            <p>实付金额：{renderAmountByMethod()}</p>
             <p>是否确认充值？</p>
           </Modal>
           <div
@@ -303,7 +394,7 @@ const TopUp = () => {
                               value = 1;
                             }
                             setTopUpCount(value);
-                            await getAmount(value);
+                            await getAmount("zfb", value);
                           }}
                       />
                       <Space>
@@ -339,14 +430,14 @@ const TopUp = () => {
                           <Form>
                             <Form.Input
                                 field={'redemptionCount'}
-                                label={'实付金额：' + renderAmount()}
-                                placeholder={'充值数量，必须整数，最低' + minTopUp + '$'}
+                                label={'实付金额：' + renderStripeAmount()}
+                                placeholder={'充值数量，必须整数，最低' + stripeMinTopUp + '$'}
                                 name='redemptionCount'
                                 type={'number'}
-                                value={topUpCount}
+                                value={stripeTopUpCount}
                                 suffix={'$'}
-                                min={minTopUp}
-                                defaultValue={minTopUp}
+                                min={stripeMinTopUp}
+                                defaultValue={stripeMinTopUp}
                                 max={100000}
                                 onChange={async (value) => {
                                   if (value < 1) {
@@ -355,8 +446,8 @@ const TopUp = () => {
                                   if (value > 100000) {
                                     value = 100000;
                                   }
-                                  setTopUpCount(value);
-                                  await getAmount(value);
+                                  setStripeTopUpCount(value);
+                                  await getAmount('stripe', value);
                                 }}
                             />
                             <Space>

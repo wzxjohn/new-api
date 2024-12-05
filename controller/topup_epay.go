@@ -28,6 +28,25 @@ func init() {
 
 type EpayAdaptor struct{}
 
+func (*EpayAdaptor) RequestAmount(c *gin.Context, req *PayRequest) {
+	if req.Amount < getMinTopup() {
+		c.JSON(200, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", getMinTopup())})
+		return
+	}
+	id := c.GetInt("id")
+	group, err := model.CacheGetUserGroup(id)
+	if err != nil {
+		c.JSON(200, gin.H{"message": "error", "data": "获取用户分组失败"})
+		return
+	}
+	payMoney := getPayMoney(float64(req.Amount), group)
+	if payMoney <= 0.01 {
+		c.JSON(200, gin.H{"message": "error", "data": "充值金额过低"})
+		return
+	}
+	c.JSON(200, gin.H{"message": "success", "data": strconv.FormatFloat(payMoney, 'f', 2, 64)})
+}
+
 func (*EpayAdaptor) RequestPay(c *gin.Context, req *PayRequest) {
 	if req.Amount < getMinTopup() {
 		c.JSON(200, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", getMinTopup())})
@@ -95,7 +114,7 @@ func (*EpayAdaptor) RequestPay(c *gin.Context, req *PayRequest) {
 		c.JSON(200, gin.H{"message": "error", "data": "创建订单失败"})
 		return
 	}
-	c.JSON(200, gin.H{"message": "success", "data": params, "url": uri})
+	c.JSON(200, gin.H{"message": "success", "data": gin.H{"params": params, "url": uri}})
 }
 
 func GetEpayClient() *epay.Client {
@@ -170,4 +189,25 @@ func EpayNotify(c *gin.Context) {
 	} else {
 		log.Printf("易支付异常回调: %v", verifyInfo)
 	}
+}
+
+func getPayMoney(amount float64, group string) float64 {
+	if !common.DisplayInCurrencyEnabled {
+		amount = amount / common.QuotaPerUnit
+	}
+	// 别问为什么用float64，问就是这么点钱没必要
+	topupGroupRatio := common.GetTopupGroupRatio(group)
+	if topupGroupRatio == 0 {
+		topupGroupRatio = 1
+	}
+	payMoney := amount * constant.EpayPrice * topupGroupRatio
+	return payMoney
+}
+
+func getMinTopup() int {
+	minTopup := constant.MinTopUp
+	if !common.DisplayInCurrencyEnabled {
+		minTopup = minTopup * int(common.QuotaPerUnit)
+	}
+	return minTopup
 }

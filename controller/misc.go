@@ -66,6 +66,7 @@ func GetStatus(c *gin.Context) {
 			"payment_enabled":          constant.PaymentEnabled,
 			"enable_online_topup":      constant.PaymentEnabled && constant.EpayAddress != "" && constant.EpayId != "" && constant.EpayKey != "",
 			"enable_stripe_topup":      constant.PaymentEnabled && constant.StripeApiSecret != "" && constant.StripeWebhookSecret != "" && constant.StripePriceId != "",
+			"stripe_min_topup":         constant.StripeMinTopUp,
 			"stripe_unit_price":        constant.StripeUnitPrice,
 			"mj_notify_enabled":        constant.MjNotifyEnabled,
 			"chats":                    constant.Chats,

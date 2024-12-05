@@ -29,6 +29,25 @@ func init() {
 type StripeAdaptor struct {
 }
 
+func (*StripeAdaptor) RequestAmount(c *gin.Context, req *PayRequest) {
+	if req.Amount < getStripeMinTopup() {
+		c.JSON(200, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", getStripeMinTopup())})
+		return
+	}
+	id := c.GetInt("id")
+	group, err := model.CacheGetUserGroup(id)
+	if err != nil {
+		c.JSON(200, gin.H{"message": "error", "data": "获取用户分组失败"})
+		return
+	}
+	payMoney := getStripePayMoney(float64(req.Amount), group)
+	if payMoney <= 0.01 {
+		c.JSON(200, gin.H{"message": "error", "data": "充值金额过低"})
+		return
+	}
+	c.JSON(200, gin.H{"message": "success", "data": strconv.FormatFloat(payMoney, 'f', 2, 64)})
+}
+
 func (*StripeAdaptor) RequestPay(c *gin.Context, req *PayRequest) {
 	if req.PaymentMethod != PaymentMethodStripe {
 		c.JSON(200, gin.H{"message": "error", "data": "不支持的支付渠道"})
@@ -73,7 +92,7 @@ func (*StripeAdaptor) RequestPay(c *gin.Context, req *PayRequest) {
 	c.JSON(200, gin.H{
 		"message": "success",
 		"data": gin.H{
-			"payLink": payLink,
+			"pay_link": payLink,
 		},
 	})
 }
@@ -208,4 +227,25 @@ func GetChargedAmount(count float64, user model.User) float64 {
 	}
 
 	return count * topUpGroupRatio
+}
+
+func getStripePayMoney(amount float64, group string) float64 {
+	if !common.DisplayInCurrencyEnabled {
+		amount = amount / common.QuotaPerUnit
+	}
+	// 别问为什么用float64，问就是这么点钱没必要
+	topupGroupRatio := common.GetTopupGroupRatio(group)
+	if topupGroupRatio == 0 {
+		topupGroupRatio = 1
+	}
+	payMoney := amount * constant.StripeUnitPrice * topupGroupRatio
+	return payMoney
+}
+
+func getStripeMinTopup() int {
+	minTopup := constant.StripeMinTopUp
+	if !common.DisplayInCurrencyEnabled {
+		minTopup = minTopup * int(common.QuotaPerUnit)
+	}
+	return minTopup
 }
