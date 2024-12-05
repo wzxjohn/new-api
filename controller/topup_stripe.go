@@ -164,7 +164,7 @@ func sessionExpired(event stripe.Event) {
 }
 
 func genStripeLink(referenceId string, customerId string, email string, amount int64) (string, error) {
-	if !strings.HasPrefix(constant.StripeApiSecret, "sk_") {
+	if !strings.HasPrefix(constant.StripeApiSecret, "sk_") && !strings.HasPrefix(constant.StripeApiSecret, "rk_") {
 		return "", fmt.Errorf("无效的Stripe API密钥")
 	}
 

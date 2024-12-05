@@ -241,7 +241,7 @@ const SystemSetting = () => {
     // Stripe Config Begin
     if (inputs.StripeApiSecret !== undefined && inputs.StripeApiSecret !== '') {
       let stripeApiSecret = removeTrailingSlash(inputs.StripeApiSecret);
-      if (stripeApiSecret && !stripeApiSecret.startsWith('sk_')) {
+      if (stripeApiSecret && !stripeApiSecret.startsWith('sk_') && !stripeApiSecret.startsWith('rk_')) {
         showError('输入了无效的Stripe API密钥');
         return;
       }
@@ -524,14 +524,14 @@ const SystemSetting = () => {
           <Form.Group widths='equal'>
             <Form.Input
                 label='API密钥'
-                placeholder='sk_xxx的Stripe密钥，敏感信息不显示'
+                placeholder='sk_xxx 或 rk_xxx 的 Stripe 密钥，敏感信息不显示'
                 value={inputs.StripeApiSecret}
                 name='StripeApiSecret'
                 onChange={handleInputChange}
             />
             <Form.Input
                 label='Webhook签名密钥'
-                placeholder='whsec_xxx的Webhook签名密钥，敏感信息不显示'
+                placeholder='whsec_xxx 的 Webhook 签名密钥，敏感信息不显示'
                 value={inputs.StripeWebhookSecret}
                 name='StripeWebhookSecret'
                 onChange={handleInputChange}
@@ -540,7 +540,7 @@ const SystemSetting = () => {
           <Form.Group widths='equal'>
             <Form.Input
                 label='商品价格ID'
-                placeholder='price_xxx的商品价格ID，新建产品后可获得'
+                placeholder='price_xxx 的商品价格 ID，新建产品后可获得'
                 value={inputs.StripePriceId}
                 name='StripePriceId'
                 onChange={handleInputChange}
