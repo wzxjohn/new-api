@@ -4,6 +4,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"strconv"
+	"sync"
 )
 
 const (
@@ -11,11 +12,19 @@ const (
 )
 
 var (
+	enableMetrics = false
+	metricsOnce   sync.Once
+
 	relaySuccess *prometheus.CounterVec
 	relayFailure *prometheus.CounterVec
 )
 
 func InitMetrics() {
+	metricsOnce.Do(doInitMetrics)
+}
+
+func doInitMetrics() {
+	enableMetrics = true
 	relaySuccess = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "newapi",
 		Subsystem: "relay",
@@ -31,6 +40,9 @@ func InitMetrics() {
 }
 
 func ReportSuccess(originalModel, upstreamModel, group string, channelID int) {
+	if !enableMetrics {
+		return
+	}
 	if upstreamModel == "" {
 		upstreamModel = unknownModel
 	}
@@ -38,6 +50,9 @@ func ReportSuccess(originalModel, upstreamModel, group string, channelID int) {
 }
 
 func ReportFailure(originalModel, upstreamModel, group string, channelID int, code int) {
+	if !enableMetrics {
+		return
+	}
 	if upstreamModel == "" {
 		upstreamModel = unknownModel
 	}
