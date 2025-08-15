@@ -177,7 +177,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			modelName := c.GetString("original_model")
 			channelId := c.GetInt("channel_id")
 			userGroup := c.GetString("group")
-			metrics.ReportFailure(modelName, "", userGroup, channelId, newAPIError.StatusCode)
+			metrics.ReportFailure(modelName, relayInfo.UpstreamModelName, userGroup, channelId, newAPIError.StatusCode)
 			if constant.ErrorLogEnabled && types.IsRecordErrorLog(newAPIError) {
 				// 保存错误日志到mysql中
 				userId := c.GetInt("id")
