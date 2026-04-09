@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"os"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -9,8 +10,9 @@ import (
 const namespace = "newapi"
 
 var (
-	initOnce sync.Once
-	enabled  bool
+	initOnce     sync.Once
+	enabled      bool
+	tier3Enabled bool
 )
 
 // ---- Tier 1: System-Level (Low Cardinality) ----
@@ -209,12 +211,15 @@ func InitMetrics() {
 			RelayErrorsTotal,
 			RelayRetriesTotal,
 		)
-		// Tier 3
-		prometheus.MustRegister(
-			TokenRequestsTotal,
-			TokenTokensUsedTotal,
-			TokenQuotaConsumedTotal,
-		)
+		// Tier 3 (high cardinality — opt-in via PROMETHEUS_TIER3_ENABLED)
+		if os.Getenv("PROMETHEUS_TIER3_ENABLED") == "true" {
+			prometheus.MustRegister(
+				TokenRequestsTotal,
+				TokenTokensUsedTotal,
+				TokenQuotaConsumedTotal,
+			)
+			tier3Enabled = true
+		}
 		enabled = true
 	})
 }
@@ -222,4 +227,9 @@ func InitMetrics() {
 // Enabled returns whether Prometheus metrics are initialized.
 func Enabled() bool {
 	return enabled
+}
+
+// Tier3Enabled returns whether high-cardinality user/token metrics are enabled.
+func Tier3Enabled() bool {
+	return tier3Enabled
 }

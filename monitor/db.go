@@ -76,6 +76,9 @@ func StartDBPoolCollector(sqlDB *sql.DB) {
 	}
 
 	go func() {
+		var lastWaitCount int64
+		var lastWaitDuration time.Duration
+
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
@@ -83,6 +86,15 @@ func StartDBPoolCollector(sqlDB *sql.DB) {
 			DBOpenConnections.WithLabelValues("open").Set(float64(stats.OpenConnections))
 			DBOpenConnections.WithLabelValues("in_use").Set(float64(stats.InUse))
 			DBOpenConnections.WithLabelValues("idle").Set(float64(stats.Idle))
+
+			if delta := stats.WaitCount - lastWaitCount; delta > 0 {
+				DBWaitTotal.Add(float64(delta))
+				lastWaitCount = stats.WaitCount
+			}
+			if delta := stats.WaitDuration - lastWaitDuration; delta > 0 {
+				DBWaitDuration.Add(delta.Seconds())
+				lastWaitDuration = stats.WaitDuration
+			}
 		}
 	}()
 }

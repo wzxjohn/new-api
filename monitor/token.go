@@ -4,7 +4,7 @@ import "strconv"
 
 // RecordTokenRequest increments the per-user per-token request counter.
 func RecordTokenRequest(userId, tokenId int) {
-	if !Enabled() {
+	if !Tier3Enabled() {
 		return
 	}
 	uid := strconv.Itoa(userId)
@@ -14,7 +14,7 @@ func RecordTokenRequest(userId, tokenId int) {
 
 // RecordTokenUsage records token and quota usage for a specific user/token.
 func RecordTokenUsage(userId, tokenId int, model string, inputTokens, outputTokens, quota int) {
-	if !Enabled() {
+	if !Tier3Enabled() {
 		return
 	}
 	uid := strconv.Itoa(userId)

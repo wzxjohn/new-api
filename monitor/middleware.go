@@ -18,19 +18,21 @@ func PrometheusMiddleware() gin.HandlerFunc {
 		HTTPActiveConnections.Inc()
 		start := time.Now()
 
+		defer func() {
+			HTTPActiveConnections.Dec()
+
+			path := c.FullPath()
+			if path == "" {
+				path = "unknown"
+			}
+			method := c.Request.Method
+			statusCode := strconv.Itoa(c.Writer.Status())
+			duration := time.Since(start).Seconds()
+
+			HTTPRequestsTotal.WithLabelValues(method, path, statusCode).Inc()
+			HTTPRequestDuration.WithLabelValues(method, path, statusCode).Observe(duration)
+		}()
+
 		c.Next()
-
-		HTTPActiveConnections.Dec()
-
-		path := c.FullPath()
-		if path == "" {
-			path = "unknown"
-		}
-		method := c.Request.Method
-		statusCode := strconv.Itoa(c.Writer.Status())
-		duration := time.Since(start).Seconds()
-
-		HTTPRequestsTotal.WithLabelValues(method, path, statusCode).Inc()
-		HTTPRequestDuration.WithLabelValues(method, path, statusCode).Observe(duration)
 	}
 }
