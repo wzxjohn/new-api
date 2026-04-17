@@ -313,8 +313,7 @@ func sessionAsyncPaymentFailed(ctx context.Context, event stripe.Event) error {
 
 	topUp.Status = common.TopUpStatusFailed
 	if err := topUp.Update(); err != nil {
-		log.Printf("标记充值订单失败出错: %v, ref: %s", err, referenceId)
-		return nil
+		return fmt.Errorf("标记充值订单失败出错, ref: %s: %w", referenceId, err)
 	}
 	log.Printf("充值订单已标记为失败: %s", referenceId)
 	return nil
@@ -342,7 +341,7 @@ func fulfillOrder(sess *stripe.CheckoutSession, eventType stripe.EventType, refe
 	}
 	if err := model.CompleteSubscriptionOrder(referenceId, common.GetJsonString(payload)); err == nil {
 		return
-	} else if err != nil && !errors.Is(err, model.ErrSubscriptionOrderNotFound) {
+	} else if !errors.Is(err, model.ErrSubscriptionOrderNotFound) {
 		log.Println("complete subscription order failed:", err.Error(), referenceId)
 		return
 	}
@@ -380,7 +379,7 @@ func sessionExpired(ctx context.Context, event stripe.Event) error {
 	defer UnlockOrder(referenceId)
 	if err := model.ExpireSubscriptionOrder(referenceId); err == nil {
 		return nil
-	} else if err != nil && !errors.Is(err, model.ErrSubscriptionOrderNotFound) {
+	} else if !errors.Is(err, model.ErrSubscriptionOrderNotFound) {
 		log.Println("过期订阅订单失败", referenceId, ", err:", err.Error())
 		return nil
 	}
@@ -398,8 +397,7 @@ func sessionExpired(ctx context.Context, event stripe.Event) error {
 	topUp.Status = common.TopUpStatusExpired
 	err = topUp.Update()
 	if err != nil {
-		log.Println("过期充值订单失败", referenceId, ", err:", err.Error())
-		return nil
+		return fmt.Errorf("过期充值订单失败, ref: %s: %w", referenceId, err)
 	}
 
 	log.Println("充值订单已过期", referenceId)
