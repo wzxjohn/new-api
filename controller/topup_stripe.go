@@ -280,12 +280,12 @@ func sessionAsyncPaymentFailed(ctx context.Context, event stripe.Event) error {
 	}
 
 	referenceId := sess.ClientReferenceID
-	log.Printf("Stripe 异步支付失败(API验证): %s", referenceId)
-
 	if len(referenceId) == 0 {
 		log.Println("异步支付失败事件未提供支付单号")
 		return nil
 	}
+
+	log.Printf("Stripe 异步支付失败(API验证): %s", referenceId)
 
 	if sess.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid {
 		log.Printf("Stripe API显示支付已成功，拒绝标记订单为失败: %s", referenceId)
