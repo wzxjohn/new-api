@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -170,15 +171,17 @@ func StripeWebhook(c *gin.Context) {
 		return
 	}
 
+	ctx := c.Request.Context()
+
 	switch event.Type {
 	case stripe.EventTypeCheckoutSessionCompleted:
-		sessionCompleted(event)
+		sessionCompleted(ctx, event)
 	case stripe.EventTypeCheckoutSessionExpired:
-		sessionExpired(event)
+		sessionExpired(ctx, event)
 	case stripe.EventTypeCheckoutSessionAsyncPaymentSucceeded:
-		sessionAsyncPaymentSucceeded(event)
+		sessionAsyncPaymentSucceeded(ctx, event)
 	case stripe.EventTypeCheckoutSessionAsyncPaymentFailed:
-		sessionAsyncPaymentFailed(event)
+		sessionAsyncPaymentFailed(ctx, event)
 	default:
 		log.Printf("不支持的Stripe Webhook事件类型: %s\n", event.Type)
 	}
@@ -188,7 +191,7 @@ func StripeWebhook(c *gin.Context) {
 
 // retrieveAndVerifyCheckoutSession calls the Stripe API to retrieve the authoritative
 // checkout session state, rather than trusting the webhook event payload alone.
-func retrieveAndVerifyCheckoutSession(sessionId string) (*stripe.CheckoutSession, error) {
+func retrieveAndVerifyCheckoutSession(ctx context.Context, sessionId string) (*stripe.CheckoutSession, error) {
 	if sessionId == "" {
 		return nil, fmt.Errorf("empty checkout session ID")
 	}
@@ -196,16 +199,22 @@ func retrieveAndVerifyCheckoutSession(sessionId string) (*stripe.CheckoutSession
 		return nil, fmt.Errorf("invalid Stripe API key configured")
 	}
 	stripe.Key = setting.StripeApiSecret
-	sess, err := session.Get(sessionId, nil)
+
+	apiCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	sess, err := session.Get(sessionId, &stripe.CheckoutSessionParams{
+		Params: stripe.Params{Context: apiCtx},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve checkout session %s from Stripe API: %w", sessionId, err)
 	}
 	return sess, nil
 }
 
-func sessionCompleted(event stripe.Event) {
+func sessionCompleted(ctx context.Context, event stripe.Event) {
 	sessionId := event.GetObjectValue("id")
-	sess, err := retrieveAndVerifyCheckoutSession(sessionId)
+	sess, err := retrieveAndVerifyCheckoutSession(ctx, sessionId)
 	if err != nil {
 		log.Printf("Stripe Checkout Session API验证失败: %v", err)
 		return
@@ -232,9 +241,9 @@ func sessionCompleted(event stripe.Event) {
 
 // sessionAsyncPaymentSucceeded handles delayed payment methods (bank transfer, SEPA, etc.)
 // that confirm payment after the checkout session completes.
-func sessionAsyncPaymentSucceeded(event stripe.Event) {
+func sessionAsyncPaymentSucceeded(ctx context.Context, event stripe.Event) {
 	sessionId := event.GetObjectValue("id")
-	sess, err := retrieveAndVerifyCheckoutSession(sessionId)
+	sess, err := retrieveAndVerifyCheckoutSession(ctx, sessionId)
 	if err != nil {
 		log.Printf("Stripe 异步支付成功事件API验证失败: %v", err)
 		return
@@ -257,9 +266,9 @@ func sessionAsyncPaymentSucceeded(event stripe.Event) {
 
 // sessionAsyncPaymentFailed marks orders as failed when delayed payment methods
 // ultimately fail (e.g. bank transfer not received, SEPA rejected).
-func sessionAsyncPaymentFailed(event stripe.Event) {
+func sessionAsyncPaymentFailed(ctx context.Context, event stripe.Event) {
 	sessionId := event.GetObjectValue("id")
-	sess, err := retrieveAndVerifyCheckoutSession(sessionId)
+	sess, err := retrieveAndVerifyCheckoutSession(ctx, sessionId)
 	if err != nil {
 		log.Printf("Stripe 异步支付失败事件API验证失败: %v", err)
 		return
@@ -342,9 +351,9 @@ func fulfillOrder(sess *stripe.CheckoutSession, eventType stripe.EventType, refe
 	log.Printf("收到款项(API验证)：%s, %.2f(%s)", referenceId, float64(sess.AmountTotal)/100, currency)
 }
 
-func sessionExpired(event stripe.Event) {
+func sessionExpired(ctx context.Context, event stripe.Event) {
 	sessionId := event.GetObjectValue("id")
-	sess, err := retrieveAndVerifyCheckoutSession(sessionId)
+	sess, err := retrieveAndVerifyCheckoutSession(ctx, sessionId)
 	if err != nil {
 		log.Printf("Stripe Checkout过期事件API验证失败: %v", err)
 		return
